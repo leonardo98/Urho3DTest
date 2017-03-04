@@ -61,6 +61,7 @@ public:
         engineParameters_["WindowHeight"] = 600;
 #endif
 
+        context_->RegisterFactory<SmallField>();
         context_->RegisterFactory<TileMap>();
 
     }
@@ -140,7 +141,6 @@ public:
         Graphics* graphics = GetSubsystem<Graphics>();
         camera->SetOrthoSize((float)graphics->GetHeight() * PIXEL_SIZE);
         camera->SetZoom(1.0f * Min((float)graphics->GetWidth() / 1280.0f, (float)graphics->GetHeight() / 800.0f)); // Set zoom according to user's resolution to ensure full visibility (initial zoom (1.0) is set for full visibility at 1280x800 resolution)
-        graphics->Clear(0, Color(1.f, 1.f, 1.f, 1.f));
 
         ResourceCache* cache = GetSubsystem<ResourceCache>();
 
@@ -155,9 +155,17 @@ public:
         spriterAnimatedSprite->SetAnimation(spriterAnimationSet->GetAnimation(m_spriterAnimationIndex));
         
         m_tileMapNode = m_scene->CreateChild("TileMap");
-        m_tileMapNode->SetScale2D(0.5f, 0.5f);
+        //m_tileMapNode->SetScale2D(0.5f, 0.5f);
         m_tileMap = m_tileMapNode->CreateComponent<TileMap>();
-        m_tileMap->Init();
+        m_tileMap->Init(100, 100, 10, 10);
+
+        for (int i = 0; i < 15; i++)
+        {
+            for (int j = 0; j < 15; j++)
+            {
+                m_tileMap->SetFieldCell(i, j, (i >=10 || j >= 10) ? 1 : 0 );
+            }
+        }
 
     }
     void HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -165,10 +173,10 @@ public:
         using namespace Update;
 
         // Take the frame time step, which is stored as a float
-        //float timeStep = eventData[P_TIMESTEP].GetFloat();
+        float timeStep = eventData[P_TIMESTEP].GetFloat();
 
         // Move the camera, scale movement with time step
-//        MoveCamera(timeStep);
+        MoveCamera(timeStep);
     }
     void SetupViewport()
     {
@@ -177,6 +185,39 @@ public:
         // Set up a viewport to the Renderer subsystem so that the 3D scene can be seen
         SharedPtr<Viewport> viewport(new Viewport(context_, m_scene, m_cameraNode->GetComponent<Camera>()));
         renderer->SetViewport(0, viewport);
+    }
+    void MoveCamera(float timeStep)
+    {
+        // Do not move if the UI has a focused element (the console)
+//        if (GetSubsystem<UI>()->GetFocusElement())
+//            return;
+
+        Input* input = GetSubsystem<Input>();
+
+        // Movement speed as world units per second
+        const float MOVE_SPEED = 4.0f;
+
+        // Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
+        if (input->GetKeyDown(KEY_W))
+            m_cameraNode->Translate(Vector3::UP * MOVE_SPEED * timeStep);
+        if (input->GetKeyDown(KEY_S))
+            m_cameraNode->Translate(Vector3::DOWN * MOVE_SPEED * timeStep);
+        if (input->GetKeyDown(KEY_A))
+            m_cameraNode->Translate(Vector3::LEFT * MOVE_SPEED * timeStep);
+        if (input->GetKeyDown(KEY_D))
+            m_cameraNode->Translate(Vector3::RIGHT * MOVE_SPEED * timeStep);
+
+        if (input->GetKeyDown(KEY_PAGEUP))
+        {
+            Camera* camera = m_cameraNode->GetComponent<Camera>();
+            camera->SetZoom(camera->GetZoom() * 1.01f);
+        }
+
+        if (input->GetKeyDown(KEY_PAGEDOWN))
+        {
+            Camera* camera = m_cameraNode->GetComponent<Camera>();
+            camera->SetZoom(camera->GetZoom() * 0.99f);
+        }
     }
 };
 URHO3D_DEFINE_APPLICATION_MAIN(MyApp)
