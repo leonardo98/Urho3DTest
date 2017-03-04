@@ -29,6 +29,7 @@ else()
 endif()
 
 # Set CMake modules search path
+# Urho3D should be build at folder "<urho3d git root>/build/"
 set (CMAKE_MODULE_PATH ${URHO3D_HOME}/../CMake/Modules)
 
 # Include Urho3D Cmake common module

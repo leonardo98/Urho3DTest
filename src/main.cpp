@@ -1,3 +1,5 @@
+#include "TileMap.h"
+
 #include <Urho3D/Engine/Application.h>
 #include <Urho3D/Core/CoreEvents.h>
 #include <Urho3D/Engine/Engine.h>
@@ -20,7 +22,6 @@
 #include <Urho3D/IO/File.h>
 
 #include <string>
-#include <vector>
 
 #ifdef WIN32
 #define printf OutputDebugString
@@ -35,13 +36,16 @@ private:
     SharedPtr<Node> m_cameraNode;
     SharedPtr<Node> m_spriterNode;
     int m_spriterAnimationIndex;
-    SharedPtr<SpriteSheet2D> m_spriteSheet;
-    Vector<SharedPtr<Node> > m_spriteNodes;
+
+    SharedPtr<Node> m_tileMapNode;
+    SharedPtr<TileMap> m_tileMap;
+    
 public:
     MyApp(Context* context)
         : Application(context)
         , m_mousePressed(false)
         , m_spriterAnimationIndex(0)
+        , m_tileMap(nullptr)
     {
     }
     virtual void Setup()
@@ -56,6 +60,9 @@ public:
         engineParameters_["WindowWidth"] = 800;
         engineParameters_["WindowHeight"] = 600;
 #endif
+
+        context_->RegisterFactory<TileMap>();
+
     }
     virtual void Start()
     {
@@ -146,162 +153,12 @@ public:
         AnimatedSprite2D* spriterAnimatedSprite = m_spriterNode->CreateComponent<AnimatedSprite2D>();
         spriterAnimatedSprite->SetAnimationSet(spriterAnimationSet);
         spriterAnimatedSprite->SetAnimation(spriterAnimationSet->GetAnimation(m_spriterAnimationIndex));
+        
+        m_tileMapNode = m_scene->CreateChild("TileMap");
+        m_tileMapNode->SetScale2D(0.5f, 0.5f);
+        m_tileMap = m_tileMapNode->CreateComponent<TileMap>();
+        m_tileMap->Init();
 
-        m_spriteSheet = cache->GetResource<SpriteSheet2D>("Custom/tiles2.xml");
-        if (!m_spriteSheet)
-            return;
-
-        // Get sprite
-        std::vector<std::string> names = {
-              "greenTile_0"
-            , "greenTile_33"
-            , "greenTile_66"
-            , "brownTile_0"
-            , "brownTile_33"
-            , "brownTile_66"
-            , "lightBrownStoneTile_0"
-            , "lightBrownStoneTile_33"
-            , "lightBrownStoneTile_66"
-            , "yellowTile_0"
-            , "yellowTile_33"
-            , "yellowTile_66"
-            , "blueStoneTile_0"
-            , "blueStoneTile_33"
-            , "blueStoneTile_66"
-            , "redStoneTile_0"
-            , "redStoneTile_33"
-            , "redStoneTile_66"
-            , "lightGreenTile_0"
-            , "lightGreenTile_33"
-            , "lightGreenTile_66"
-            , "lightBlueTile_0"
-            , "lightBlueTile_33"
-            , "lightBlueTile_66"
-            , "brickR_0"
-            , "brickR_33"
-            , "brickR_66"
-            , "brickL_0"
-            , "brickL_33"
-            , "brickL_66"
-            , "brickC_0"
-            , "brickC_33"
-            , "brickC_66"
-            , "brownStoneTile_0"
-            , "brownStoneTile_33"
-            , "brownStoneTile_66"
-            , "turquoiseTile_0"
-            , "turquoiseTile_33"
-            , "turquoiseTile_66"
-
-            , "whiteTile_0"
-            , "whiteTile_33"
-            , "whiteTile_66"
-            , "flat1_0"
-            , "flat1_33"
-            , "flat1_66"
-            , "flat2_0"
-            , "flat2_33"
-            , "flat2_66"
-            , "flat3_0"
-            , "flat3_33"
-            , "flat3_66"
-            , "flat4_0"
-            , "flat4_33"
-            , "flat4_66"
-            , "round4_0"
-            , "round4_33"
-            , "round4_66"
-            , "cubic2_0"
-            , "cubic2_33"
-            , "cubic2_66"
-            , "grayStoneTile_0"
-            , "grayStoneTile_33"
-            , "grayStoneTile_66"
-            , "cubic3_0"
-            , "cubic3_33"
-            , "cubic3_66"
-            , "fullBlackTileWall_0"
-            , "fullBlackTileWall_33"
-            , "fullBlackTileWall_66"
-            , "cubic4_0"
-            , "cubic4_33"
-            , "cubic4_66"
-            , "expFunnel_0"
-            , "expFunnel_33"
-            , "expFunnel_66"
-            , "cubic1_0"
-            , "cubic1_33"
-            , "cubic1_66"
-            , "blackTile_0"
-            , "blackTile_33"
-            , "blackTile_66"
-            , "round1_0"
-            , "round1_33"
-            , "round1_66"
-            , "blueTile_0"
-            , "blueTile_33"
-            , "blueTile_66"
-            , "round2_0"
-            , "round2_33"
-            , "round2_66"
-            , "round3_0"
-            , "round3_33"
-            , "round3_66"
-        };
-
-        float halfWidth = graphics->GetWidth() * 0.5f * PIXEL_SIZE;
-        float halfHeight = graphics->GetHeight() * 0.5f * PIXEL_SIZE;
-        float x = -halfWidth;
-        float y = -halfHeight;
-        for (unsigned i = 0; i < names.size(); ++i)
-        {
-            SharedPtr<Node> spriteNode(m_scene->CreateChild("StaticSprite2D"));
-            spriteNode->SetPosition(Vector3(x, y, 0.0f));
-            x += 100 * PIXEL_SIZE;
-            if (x > halfWidth)
-            {
-                x = -halfWidth;
-                y += 50 * PIXEL_SIZE;
-            }
-
-            StaticSprite2D* staticSprite = spriteNode->CreateComponent<StaticSprite2D>();
-            // Set random color
-            //staticSprite->SetColor(Color(Random(1.0f), Random(1.0f), Random(1.0f), 1.0f));
-            // Set blend mode
-            staticSprite->SetBlendMode(BLEND_ALPHA);
-            // Set sprite
-            Sprite2D* sprite = m_spriteSheet->GetSprite(names[i % names.size()].c_str());
-            if (sprite)
-                staticSprite->SetSprite(sprite);
-            else
-                int i = 0;
-
-            // Set move speed
-            //spriteNode->SetVar(VAR_MOVESPEED, Vector3(Random(-2.0f, 2.0f), Random(-2.0f, 2.0f), 0.0f));
-            // Set rotate speed
-            //spriteNode->SetVar(VAR_ROTATESPEED, Random(-90.0f, 90.0f));
-
-            // Add to sprite node vector
-            m_spriteNodes.Push(spriteNode);
-        }
-
-        //// Get tmx file
-        //TmxFile2D* tmxFile = cache->GetResource<TmxFile2D>("Urho2D/isometric_grass_and_water.tmx");
-        //if (!tmxFile)
-        //    return;
-
-        //SharedPtr<Node> tileMapNode(scene_->CreateChild("TileMap"));
-        //tileMapNode->SetPosition(Vector3(0.0f, 0.0f, -1.0f));
-
-        //TileMap2D* tileMap = tileMapNode->CreateComponent<TileMap2D>();
-        //// Set animation
-        //tileMap->SetTmxFile(tmxFile);
-
-        //// Set camera's position
-        //const TileMapInfo2D& info = tileMap->GetInfo();
-        //float x = info.GetMapWidth() * 0.5f;
-        //float y = info.GetMapHeight() * 0.5f;
-        //m_cameraNode->SetPosition(Vector3(x, y, -10.0f));
     }
     void HandleUpdate(StringHash eventType, VariantMap& eventData)
     {
