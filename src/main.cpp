@@ -20,6 +20,7 @@
 #include <Urho3D/Urho2D/SpriteSheet2D.h>
 #include <Urho3D/Urho2D/Sprite2D.h>
 #include <Urho3D/IO/File.h>
+#include <Urho3D/UI/UI.h>
 
 #include <string>
 
@@ -189,8 +190,8 @@ public:
     void MoveCamera(float timeStep)
     {
         // Do not move if the UI has a focused element (the console)
-//        if (GetSubsystem<UI>()->GetFocusElement())
-//            return;
+        if (GetSubsystem<UI>()->GetFocusElement())
+            return;
 
         Input* input = GetSubsystem<Input>();
 
