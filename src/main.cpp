@@ -62,8 +62,8 @@ public:
         engineParameters_["WindowHeight"] = 600;
 #endif
 
-        context_->RegisterFactory<SmallField>();
-        context_->RegisterFactory<TileMap>();
+        TileMap::RegisterObject(context_);
+        //context_->RegisterFactory<TileMap>();
 
     }
     virtual void Start()

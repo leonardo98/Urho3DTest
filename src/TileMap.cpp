@@ -4,103 +4,30 @@
 #include <Urho3D/Urho2D/StaticSprite2D.h>
 #include <Urho3D/Graphics/Graphics.h>
 #include <Urho3D/IO/Log.h>
+#include <Urho3D/Urho2D/Sprite2D.h>
+#include <Urho3D/Core/Context.h>
+#include <Urho3D/Scene/Node.h>
+#include <Urho3D/Urho2D/Renderer2D.h>
+#include <Urho3D/Graphics/Material.h>
 
-SmallField::SmallField(Context* context)
-    : Component(context)
+void TileMap::RegisterObject(Context* context)
 {
+    context->RegisterFactory<TileMap>();//URHO2D_CATEGORY);
+    URHO3D_COPY_BASE_ATTRIBUTES(Drawable2D);
 }
-
-void SmallField::Init(unsigned int width, unsigned int height)
-{
-    m_field.Resize(width);
-    for (auto &column: m_field)
-    {
-        column.Resize(height);
-        for (auto &cell: column)
-        {
-            cell = nullptr;
-        }
-    }
-
-}
-
-SharedPtr<Node> SmallField::SetCell(unsigned int i, unsigned int j, Sprite2D *sprite)
-{
-//    Graphics* graphics = GetSubsystem<Graphics>();
-
-    SharedPtr<Node> spriteNode(GetNode()->CreateChild("StaticSprite2D"));
-    StaticSprite2D* staticSprite = spriteNode->CreateComponent<StaticSprite2D>();
-    if (sprite)
-        staticSprite->SetSprite(sprite);
-    else
-        Log::Write(10, "sprite is null");
-
-    m_field[i][j] = spriteNode;
-
-    return spriteNode;
-//    for (unsigned i = 0; i < m_names.size(); ++i)
-//    {
-//        SharedPtr<Node> spriteNode(GetNode()->CreateChild("StaticSprite2D"));
-//        spriteNode->SetPosition(Vector3(x, y, 0.0f));
-//        x += 100 * PIXEL_SIZE;
-//        if (x > halfWidth)
-//        {
-//            x = -halfWidth;
-//            y += 50 * PIXEL_SIZE;
-//        }
-//
-//        StaticSprite2D* staticSprite = spriteNode->CreateComponent<StaticSprite2D>();
-//        // Set random color
-//        //staticSprite->SetColor(Color(Random(1.0f), Random(1.0f), Random(1.0f), 1.0f));
-//        // Set blend mode
-//        staticSprite->SetBlendMode(BLEND_ALPHA);
-//        // Set sprite
-//        Sprite2D* sprite = m_spriteSheet->GetSprite(m_names[i % m_names.size()].c_str());
-//        if (sprite)
-//            staticSprite->SetSprite(sprite);
-//        else
-//            int i = 0;
-//
-//        // Set move speed
-//        //spriteNode->SetVar(VAR_MOVESPEED, Vector3(Random(-2.0f, 2.0f), Random(-2.0f, 2.0f), 0.0f));
-//        // Set rotate speed
-//        //spriteNode->SetVar(VAR_ROTATESPEED, Random(-90.0f, 90.0f));
-//
-//        // Add to sprite node vector
-//        m_spriteNodes.Push(spriteNode);
-//    }
-}
-
 
 TileMap::TileMap(Context* context)
-    : Component(context)
+    : Drawable2D(context)
     , m_spriteSheet(nullptr)
     , m_cellWidth(100)
     , m_cellHeight(50)
 {
+    sourceBatches_.Resize(1);
+    sourceBatches_[0].owner_ = this;
 }
 
-void TileMap::Init(unsigned int rowMax, unsigned int colMax, unsigned int smallFieldWidth, unsigned int smallFieldHeight)
+void TileMap::InitNames()
 {
-    m_smallFieldWidth = smallFieldWidth;
-    m_smallFieldHeight = smallFieldHeight;
-    m_bigField.Resize(colMax);
-    for (auto &column: m_bigField)
-    {
-        column.Resize(rowMax);
-        for (auto &smallField: column)
-        {
-            smallField = nullptr;
-        }
-    }
-
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
-
-    m_spriteSheet = cache->GetResource<SpriteSheet2D>("Custom/tiles2.xml");
-    if (!m_spriteSheet)
-        return;
-
-    // Get sprite
     m_names.clear();
 
     // TODO: remove this line
@@ -204,52 +131,117 @@ void TileMap::Init(unsigned int rowMax, unsigned int colMax, unsigned int smallF
     m_names.push_back("round3_0");
     m_names.push_back("round3_33");
     m_names.push_back("round3_66");
-    
-
-    //// Get tmx file
-    //TmxFile2D* tmxFile = cache->GetResource<TmxFile2D>("Urho2D/isometric_grass_and_water.tmx");
-    //if (!tmxFile)
-    //    return;
-
-    //SharedPtr<Node> tileMapNode(scene_->CreateChild("TileMap"));
-    //tileMapNode->SetPosition(Vector3(0.0f, 0.0f, -1.0f));
-
-    //TileMap2D* tileMap = tileMapNode->CreateComponent<TileMap2D>();
-    //// Set animation
-    //tileMap->SetTmxFile(tmxFile);
-
-    //// Set camera's position
-    //const TileMapInfo2D& info = tileMap->GetInfo();
-    //float x = info.GetMapWidth() * 0.5f;
-    //float y = info.GetMapHeight() * 0.5f;
-    //m_cameraNode->SetPosition(Vector3(x, y, -10.0f));
 }
 
-void TileMap::CreateSmallField(unsigned int row, unsigned int col)
+void TileMap::Init(unsigned int width, unsigned int height, unsigned int cellWidth, unsigned int cellHeight)
 {
+    m_fieldWidth = cellWidth;
+    m_fieldHeight = cellHeight;
+    m_field.resize(width);
+    for (auto &column: m_field)
+    {
+        column.resize(height);
+        for (auto &cell: column)
+        {
+            cell = -1;
+        }
+    }
+
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    m_spriteSheet = cache->GetResource<SpriteSheet2D>("Custom/tiles2.xml");
+    if (!m_spriteSheet)
+        return;
+
+    InitNames();
+    UpdateMaterial();
 }
 
-void TileMap::SetFieldCell(unsigned int i, unsigned int j, int index)
+void TileMap::SetFieldCell(unsigned int i, unsigned int j, char index)
 {
-    unsigned int sfIndexCol = j / m_smallFieldHeight;
-    unsigned int sfIndexRow = i / m_smallFieldWidth;
-    SmallField *smallField = nullptr;
-    if (m_bigField[sfIndexRow][sfIndexCol] == nullptr)
-    {
-        m_bigField[sfIndexRow][sfIndexCol] = GetNode()->CreateChild("SmallField");
-        smallField = m_bigField[sfIndexRow][sfIndexCol]->CreateComponent<SmallField>();
-        smallField->Init(m_smallFieldWidth, m_smallFieldHeight);
-    }
-    else
-    {
-        smallField = m_bigField[sfIndexRow][sfIndexCol]->GetComponent<SmallField>();
-    }
-    unsigned int sfCol = j % m_smallFieldHeight;
-    unsigned int sfRow = i % m_smallFieldWidth;
-    index = sfIndexRow * 2 + sfIndexCol;// TODO: remove this line
-    Node *node = smallField->SetCell(sfRow, sfCol, m_spriteSheet->GetSprite(m_names[index].c_str()));
+    m_field[i][j] = index;
+    sourceBatchesDirty_ = true;
+    MarkNetworkUpdate();
+}
+
+void TileMap::UpdateSourceBatches()
+{
     Vector3 shiftX(m_cellWidth / 2 * PIXEL_SIZE, m_cellHeight / 2 * PIXEL_SIZE, 0.f);
     Vector3 shiftY(- m_cellWidth / 2 * PIXEL_SIZE, m_cellHeight / 2 * PIXEL_SIZE, 0.f);
-    node->SetPosition(i * shiftX + j * shiftY);
+
+    Vector<Vertex2D>& vertices = sourceBatches_[0].vertices_;
+    vertices.Clear();
+
+    Rect drawRect;
+    Rect textureRect;
+    Sprite2D *sprite;
+
+    Vertex2D vertex0;
+    Vertex2D vertex1;
+    Vertex2D vertex2;
+    Vertex2D vertex3;
+
+    const Matrix3x4& worldTransform = node_->GetWorldTransform();
+
+    vertex0.color_ = vertex1.color_ = vertex2.color_ = vertex3.color_ = 0xFFFFFFFF;
+
+    for (unsigned int i = 0; i < m_field.size(); i++)
+    {
+        for (unsigned int j = 0; j < m_field[i].size(); j++)
+        {
+            if (m_field[i][j] != -1)
+            {
+                sprite = m_spriteSheet->GetSprite(m_names[m_field[i][j]].c_str());
+                if (!sprite->GetDrawRectangle(drawRect))
+                    continue;
+                if (!sprite->GetTextureRectangle(textureRect))
+                    continue;
+
+                Vector3 shift(i * shiftX + j * shiftY);
+
+                // Convert to world space
+                vertex0.position_ = worldTransform * Vector3(drawRect.min_.x_, drawRect.min_.y_, 0.0f) + shift;
+                vertex1.position_ = worldTransform * Vector3(drawRect.min_.x_, drawRect.max_.y_, 0.0f) + shift;
+                vertex2.position_ = worldTransform * Vector3(drawRect.max_.x_, drawRect.max_.y_, 0.0f) + shift;
+                vertex3.position_ = worldTransform * Vector3(drawRect.max_.x_, drawRect.min_.y_, 0.0f) + shift;
+
+                vertex0.uv_ = textureRect.min_;
+                vertex1.uv_ = Vector2(textureRect.min_.x_, textureRect.max_.y_);
+                vertex2.uv_ = textureRect.max_;
+                vertex3.uv_ = Vector2(textureRect.max_.x_, textureRect.min_.y_);
+
+                vertices.Push(vertex0);
+                vertices.Push(vertex1);
+                vertices.Push(vertex2);
+                vertices.Push(vertex3);
+            }
+        }
+    }
+
+    sourceBatchesDirty_ = false;
 }
 
+void TileMap::UpdateMaterial()
+{
+    if (m_names.empty())
+        return;
+    Sprite2D *sprite = m_spriteSheet->GetSprite(m_names[0].c_str());
+    sourceBatches_[0].material_ = renderer_->GetMaterial(sprite->GetTexture(), BLEND_ALPHA);
+}
+
+void TileMap::OnDrawOrderChanged()
+{
+    sourceBatches_[0].drawOrder_ = GetDrawOrder();
+}
+
+void TileMap::OnWorldBoundingBoxUpdate()
+{
+    boundingBox_.Clear();
+    worldBoundingBox_.Clear();
+
+    const Vector<SourceBatch2D>& sourceBatches = GetSourceBatches();
+    for (unsigned i = 0; i < sourceBatches[0].vertices_.Size(); ++i)
+        worldBoundingBox_.Merge(sourceBatches[0].vertices_[i].position_);
+
+    boundingBox_ = worldBoundingBox_.Transformed(node_->GetWorldTransform().Inverse());
+}
